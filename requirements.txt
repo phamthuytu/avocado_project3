@@ -1,0 +1,15 @@
+streamlit
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+pandas-profiling
+time
+statsmodels.tsa.arima_model
+statsmodels.tsa.stattools
+itertools
+sklearn.model_selection
+sklearn.metrics
+sklearn.ensemble
+prophet
