@@ -7,6 +7,5 @@ scikit-learn
 pandas-profiling
 datetime
 statsmodels
-itertools
 sklearn
 prophet
