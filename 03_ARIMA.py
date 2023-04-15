@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 import seaborn as sns
 from datetime import datetime
+import time
 
 from itertools import combinations
 from sklearn.metrics import mean_absolute_error
@@ -49,14 +50,35 @@ df_conventional = df_LosAngeles[(df_LosAngeles.type=="conventional")].groupby(['
 df_conventional = df_conventional.resample('W').mean()
 df_conventional = df_conventional.to_frame(name='AveragePrice')
 
-# Xử lý tính dừng cho bộ dữ liệu
-df_organic_diff= df_organic['AveragePrice'].diff()
-df_organic_diff = df_organic_diff.dropna()
-df_organic_diff=df_organic_diff.to_frame()
 
-df_conventional_diff= df_conventional['AveragePrice'].diff()
-df_conventional_diff = df_conventional_diff.dropna()
-df_conventional_diff=df_conventional_diff.to_frame()
+@st.cache_data
+def visual_plot(df):
+    df=df.reset_index()
+    df.sort_values(by=['Date'])
+    fig2 = plt.figure(figsize = (27, 12))
+    ax = plt.axes()
+    #set ticks every month
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    #set major ticks format
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+    plt.plot(df['Date'],df['AveragePrice'],color='b', linewidth=1)
+    plt.xlabel("2015-2018")
+    plt.ylabel("Avocado Price USD")
+    plt.legend()
+    st.pyplot(fig2)
+
+@st.cache_data
+def df_diff(df):
+    df=df['AveragePrice'].diff()
+    df=df.to_frame()
+    df=df.dropna()
+    # Tính toán phức tạp
+    return df
+
+# Xử lý tính dừng cho bộ dữ liệu
+df_organic_diff= df_diff(df_organic)
+
+df_conventional_diff= df_diff(df_conventional)
 
 # Splitting data into training and test set
 train_size = int(len(df_organic_diff) * 0.75)
@@ -66,25 +88,37 @@ train_size = int(len(df_conventional_diff) * 0.75)
 train_conventional, test_conventional = df_conventional_diff[0:train_size], df_conventional_diff[train_size:]
 
 # 3. Build model
+@st.cache_data
+def build_model(df):
+    model_sarimax = sm.tsa.statespace.SARIMAX(df,order = (1,1,0),seasonal_order = (1,1,1,52))
+    model_fit_sarimax = model_sarimax.fit()
+    return model_fit_sarimax
 
-import time
-start_time_organic=time.time()
+start_time=time.time()
+model_fit_sarimax_organic=build_model(train_organic)
+end_time=time.time()
+total_time_organic=end_time-start_time
 
-model_sarimax_organic = sm.tsa.statespace.SARIMAX(train_organic,order = (1,1,0),seasonal_order = (1,1,1,52))
-model_fit_sarimax_organic = model_sarimax_organic.fit()
+start_time=time.time()
+model_fit_sarimax_conventional=build_model(train_conventional)
+end_time=time.time()
+total_time_conventional=end_time-start_time
 
-end_time_organic=time.time()
-total_time_organic=end_time_organic-start_time_organic
+#4. Evaluate model and prediction
 
-start_time_conventional=time.time()
+def predict_func(model_fit,start,end):
+    pred_test = model_fit.predict(start = start, end =end,dynamic=True)
+    pred_test
 
-model_sarimax_conventional = sm.tsa.statespace.SARIMAX(train_conventional,order = (1,1,0),seasonal_order = (1,1,1,52))
-model_fit_sarimax_conventional = model_sarimax_conventional.fit()
+    pred_range = model_fit.get_prediction(start = start, end = end,dynamic=True)
+    pred_ci_range = pred_range.conf_int()
+    pred_ci_range
 
-end_time_conventional=time.time()
-total_time_conventional=end_time_conventional-start_time_conventional
-
-#4. Evaluate model
+    fig, ax = plt.subplots()       
+    ax.plot(pred_test,color='red',label = 'Predicted Values')
+    ax.plot(model_fit.fittedvalues, color='blue',label = 'Real Values');
+    plt.legend(loc="upper left")
+    st.pyplot(fig)
 
 # GUI
 menu = ["Business Objective", 'Build Project', 'New Prediction']
@@ -105,65 +139,19 @@ if choice == 'Business Objective':
     import matplotlib.dates as mdates
 
     st.write('Data chuỗi thời gian LOSANGELES loại Organic ban đầu: ')
-    data_organic=df_organic.reset_index()
-    data_organic.sort_values(by=['Date'])
-    fig2 = plt.figure(figsize = (27, 12))
-    ax = plt.axes()
-    #set ticks every month
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    #set major ticks format
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-    plt.plot(data_organic['Date'],data_organic['AveragePrice'],color='b', linewidth=1)
-    plt.xlabel("2015-2018")
-    plt.ylabel("Avocado Price USD")
-    plt.legend()
-    st.pyplot(fig2)
+    visual_plot(df_organic)
 
     st.write('Data chuỗi thời gian LOSANGELES loại Conventional ban đầu: ')
-    data_conventional=df_conventional.reset_index()
-    data_conventional.sort_values(by=['Date'])
-    fig3 = plt.figure(figsize = (27, 12))
-    ax = plt.axes()
-    #set ticks every month
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    #set major ticks format
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-    plt.plot(data_conventional['Date'],data_conventional['AveragePrice'],color='b', linewidth=1)
-    plt.xlabel("2015-2018")
-    plt.ylabel("Avocado Price USD")
-    plt.legend()
-    st.pyplot(fig3)
+    visual_plot(df_conventional)
 
-    st.subheader('Data chuỗi thời gian LOSANGELES sau khi loại bỏ tính dừng: ')
-    st.write('Data chuỗi thời gian LOSANGELES loại Organic sau khi loại bỏ tính dừng: ')
-    data_organic_diff=df_organic_diff.reset_index()
-    data_organic_diff.sort_values(by=['Date'])
-    fig4 = plt.figure(figsize = (27, 12))
-    ax = plt.axes()
-    #set ticks every month
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    #set major ticks format
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-    plt.plot(data_organic_diff['Date'],data_organic_diff['AveragePrice'],color='b', linewidth=1)
-    plt.xlabel("2015-2018")
-    plt.ylabel("Avocado Price USD")
-    plt.legend()
-    st.pyplot(fig4)
+    st.subheader('Data chuỗi thời gian LOSANGELES sau khi thực hiện sai phân: ')
+    st.write('Data chuỗi thời gian LOSANGELES loại Organic sau khi thực hiện sai phân: ')
+
+    visual_plot(df_organic_diff)
 
     st.write('Data chuỗi thời gian LOSANGELES loại Conventional sau khi loại bỏ tính dừng: ')
-    data_conventional_diff=df_conventional_diff.reset_index()
-    data_conventional_diff.sort_values(by=['Date'])
-    fig5 = plt.figure(figsize = (27, 12))
-    ax = plt.axes()
-    #set ticks every month
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    #set major ticks format
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-    plt.plot(data_conventional_diff['Date'],data_conventional_diff['AveragePrice'],color='b', linewidth=1)
-    plt.xlabel("2015-2018")
-    plt.ylabel("Avocado Price USD")
-    plt.legend()
-    st.pyplot(fig5)
+    
+    visual_plot(df_conventional_diff)
 
 elif choice == 'Build Project':
 
@@ -188,10 +176,10 @@ elif choice == 'Build Project':
     st.write(df_organic.describe().T)
 
     st.write("##### 4. Build model...")
-    st.code('Thời gian thực hiện model trên bơ Organic tại LosAngeles '+str(total_time_organic))
+    st.code('Thời gian thực hiện model trên bơ Organic tại LosAngeles '+str(total_time_organic)+' giây')
     st.write('Tham số tối ưu trong mô hình dự đoán trên bơ Organic tại LosAngeles')
     st.write(model_fit_sarimax_organic.summary())
-    st.code('Thời gian thực hiện model trên bơ Conventional tại LosAngeles '+str(total_time_conventional))
+    st.code('Thời gian thực hiện model trên bơ Conventional tại LosAngeles '+str(total_time_conventional)+' giây')
 
     st.write("##### 5. Evaluation")
     pred_organic = model_fit_sarimax_organic.predict()
@@ -218,21 +206,7 @@ elif choice == 'Build Project':
 
 elif choice=='New Prediction':
 
-    st.subheader("Kết quả dự đoán trong 20 tuần")
-    
-    forecast_organic = model_fit_sarimax_organic.get_forecast(steps=20)
-    forecast_ci_organic = forecast_organic.conf_int()
-    forecast_ci_organic
-
-    forecast_conventional = model_fit_sarimax_conventional.get_forecast(steps=20)
-    forecast_ci_conventional = forecast_conventional.conf_int()
-    forecast_ci_conventional
-
     st.subheader('Kết quả dự đoán trong 20 tuần trong tương lai: ')
-    pred_organic = model_fit_sarimax_organic.get_prediction(start = 169, end = 189)
-    pred_ci_organic = pred_organic.conf_int()
-    pred_ci_organic
 
-    pred_conventional = model_fit_sarimax_conventional.get_prediction(start = 169, end = 189)
-    pred_ci_conventional = pred_conventional.conf_int()
-    pred_ci_conventional
+    predict_func(model_fit_sarimax_organic,135,185)
+    predict_func(model_fit_sarimax_conventional,135,185)

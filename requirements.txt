@@ -8,3 +8,4 @@ pandas-profiling
 datetime
 statsmodels
 prophet
+xgboost

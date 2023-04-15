@@ -17,7 +17,7 @@ from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from math import sqrt
 from sklearn.metrics import max_error
-from sklearn.ensemble import RandomForestRegressor
+import xgboost as xgb
 
 # 1. Read data
 data = pd.read_csv("data_dropDate.csv")
@@ -29,10 +29,10 @@ st.title("Data Science Project")
 st.write("## USA’s Avocado AveragePrice Prediction")
 
 # Hiển thị dữ liệu sau tiền xử lý
-df_cleaned=pd.read_csv("df_final_scaled_encoded.csv")
+df_cleaned=pd.read_csv("df_remove_region_encode_dummy.csv")
 
 data_new=df_cleaned.drop(['Unnamed: 0'],axis=1)
-X=data_new.drop(['AveragePrice'],axis=1)
+X=data_new.drop(['AveragePrice','Date','type'],axis=1)
 y=data_new.AveragePrice
 
 # 3. Build model
@@ -41,26 +41,12 @@ y=data_new.AveragePrice
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.20)
 
-rd_model = RandomForestRegressor()
-rd_model.fit(X_train, y_train)
+xgb_model = xgb.XGBRegressor(learning_rate = 0.2946386696029385,max_depth= 10,n_estimators =571,reg_alpha =  0.8663005771251282)
+xgb_model.fit(X_train, y_train)
 
 #4. Evaluate model
-score_train=rd_model.score(X_train, y_train)
-score_test=rd_model.score(X_test, y_test)
-
-
-#5. Save models
-# luu model classication
-pkl_filename = "rd_model.pkl"  
-with open(pkl_filename, 'wb') as file:  
-    pickle.dump(rd_model, file)
-
-
-#6. Load models 
-# Đọc model
-# import pickle
-with open(pkl_filename, 'rb') as file:  
-    rd_model = pickle.load(file)
+score_train=xgb_model.score(X_train, y_train)
+score_test=xgb_model.score(X_test, y_test)
 
 # GUI
 menu = ["Business Objective", 'Build Project', 'New Prediction']
@@ -136,12 +122,12 @@ elif choice == 'Build Project':
             ax.spines[s].set_visible(False)
     st.pyplot(fig)
 
-    st.markdown('Chọn phương pháp RandomForest')
+    st.markdown('Chọn phương pháp XGB REGRESSOR')
     st.write("##### 4. Evaluation")
     st.code("Score train:"+ str(round(score_train,2)) + " vs Score test:" + str(round(score_test,2)))
         
-    y_train_pred = rd_model.predict(X_train)
-    y_test_pred = rd_model.predict(X_test)
+    y_train_pred = xgb_model.predict(X_train)
+    y_test_pred = xgb_model.predict(X_test)
         
     st.code('Train Set:')
     st.code('RMSE :'+ str( mean_squared_error(y_train, y_train_pred, squared = False)))
@@ -168,7 +154,7 @@ elif choice=='New Prediction':
         lines = lines[0]     
 
     st.write("Content:")
-    y_pred_new = rd_model.predict(X_test)
+    y_pred_new = xgb_model.predict(X_test)
 
     y_pred_new=pd.DataFrame(y_pred_new, columns=['y_pred_new'])
     df_result=(pd.concat([y_test.reset_index(),y_pred_new],axis=1))
